@@ -1,4 +1,4 @@
-# Ten Seconds of Primes
+# Optimizing Prime Counting on CPUs and GPUs
 
 15-418 project proposal by Gabe Pacella.
 
