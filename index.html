@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Optimizing Prime Counting on CPUs and GPUs — 15-418 Project Proposal</title>
+<title>A Path Tracing Renderer using CUDA — 15-418 Project Proposal</title>
 <style>
 body { margin: 40px auto; padding: 0 20px; max-width: 850px; background: #fff; color: #000; font: 16px/1.6 Arial, sans-serif; }
 h1 { font-size: 30px; line-height: 1.2; margin-bottom: 8px; }
@@ -20,100 +20,82 @@ tbody th { white-space: nowrap; }
 </style>
 </head>
 <body>
-<h1>Optimizing Prime Counting on CPUs and GPUs</h1>
-<p>15-418 Project Proposal<br>Gabe Pacella</p>
+<main>
+<h1>A Path Tracing Renderer using CUDA</h1>
+<p>15-418 Project Proposal<br>Gabe Pacella (gpacell2)</p>
 <p>Project URL: <a href="https://gpack2.github.io/15418-final-project/">https://gpack2.github.io/15418-final-project/</a></p>
-
 <section id="summary">
 <h2>Summary</h2>
-<p>I will implement and optimize a segmented prime sieve to count as many primes as possible in ten seconds on the hardware available to me. The core project will compare an optimized multicore CPU implementation with an NVIDIA GPU implementation, with AMD GPUs and distributed execution as stretch goals.</p>
+<p>I am going to implement a GPU-accelerated path tracer using CUDA and C++, running on the NVIDIA GPUs in the GHC computers. The implementation will parallelize ray generation, intersection testing using bounding volume hierarchy (BVH) traversal, and light transport across thousands of rays.</p>
 </section>
 <section id="background">
 <h2>Background</h2>
-<p>The Sieve of Eratosthenes finds primes by marking multiples of smaller primes as composite. A segmented sieve processes a limited interval at a time, allowing it to count primes over large ranges without storing all candidates simultaneously. To sieve through a chosen upper bound N, it first generates the base primes through the square root of N.</p>
-<p>After generating the base primes, separate intervals can be processed independently. This provides parallelism across CPU cores, GPU thread blocks, and potentially separate computers. Each worker marks composites in its interval and counts the unmarked entries. I will store only odd candidates and handle 2 separately.</p>
-<p>The goal is to maximize the number of primes counted in a completely checked interval beginning at 2. I will investigate how the implementation should change for each architecture, including memory representation, segment size, and work assignment.</p>
+<p>In the real world, objects are illuminated by direct and indirect light sources. A lamp illuminates a table by shining directly onto it, but that table also illuminates other objects indirectly by reflecting the lamp’s light onto them. So, in order to model this light behavior, we represent light using rays and represent the properties of light by following the paths of these light rays in a technique called path tracing.</p>
+<p>Path tracing is a way to efficiently model the behavior of light by shooting a ray from the camera to every pixel in the image. When a ray intersects an object, it can bounce in a new direction depending on the object’s material. This process continues until a ray reaches it’s maximum number of bounces or hits a light source, and then the resulting light contributions are used to calculate the pixel’s color.</p>
+<p>Path tracing is computationally expensive because each ray may require multiple object intersection tests and bounces, and high resolution image can have millions of rays. However, all of these ray operations are entirely independent, which means we can process them in parallel on the GPU. Using CUDA, we can parallelize ray generation, intersection testing, and light transport across all GPU threads.</p>
+<p>Determining object intersections (intersection testing) is the most costly computation for each ray, so to accelerate this, I plan to use a bounding volume hierarchy (BVH). A BVH organizes objects into a tree of bounding boxes, with the objects themselves as the tree nodes. Using this data structure, we can skip groups of objects that certainly cannot be intersected by the current ray. Each GPU thread will traverse the BVH for it’s own ray, allowing many rays to be processed in parallel.</p>
 </section>
 <section id="challenge">
-<h2>The challenge</h2>
-<p>Memory locality. Marking multiples creates strided writes. CPU segments must balance cache locality against setup overhead, while GPU work assignment affects memory access efficiency.<br>Storage and synchronization. Bits reduce storage but require bit manipulation. Concurrent GPU writes to the same location, including different bits of one word, require ownership rules or appropriate synchronization to avoid races.<br>Load balance. Small primes require more marking operations than large primes. Work assignments must account for these differences while exposing enough parallelism.<br>Parallel overhead. Thread coordination, GPU launches, allocation, initialization, transfers, and counting can reduce time available for useful sieving.<br>Architecture differences. CPU and GPU versions may need different strategies. I will compare successive optimizations on the same hardware to distinguish software improvements from hardware differences.<br>I hope to identify the dominant bottlenecks on each architecture and explain how implementation choices affect them.</p>
+<h2>The Challenge</h2>
+<p>The main challenge is efficiently parallelizing path tracing on the GPU. Although rays can be processed independently, they all can take different paths and require different amounts of bounces, leading to thread divergence and load imbalance. Also, the BVH tree can introduce irregular and non-homogenous memory accesses, since rays might traverse different parts of the tree. I hope to learn how to perform GPU and CUDA optimizations involving thread-blocks and memory accesses to increase rendering performance.</p>
 </section>
 <section id="resources">
 <h2>Resources</h2>
-<p>I will write the sieve from scratch in C++, using OpenMP for CPU parallelism and CUDA for NVIDIA GPUs. I plan to use GHC machines with NVIDIA GPUs, subject to confirming specifications, availability, and usage rules.</p>
-<p>Additional hardware includes my desktop with an AMD GPU, a 2018 MacBook Pro, a ThinkPad T480, and an Asus Zenbook from approximately 2021. I will record CPU and GPU models, core counts, memory capacities, operating systems, compilers, and build options. Software support for my specific AMD GPU remains to be checked. Access to Pittsburgh Supercomputing Center machines is a possible extension and has not been secured.</p>
-<p>The primesieve project and documentation will serve as an algorithm reference and an external CPU performance baseline. I will validate small inputs against a simple reference sieve and larger inputs against independently verified counts. HIP and MPI are possible tools for the AMD and distributed extensions.</p>
+<p>I plan to use the NVIDIA GPUs on the GHC machines and implement the path tracer primarily from scratch using C++ and CUDA. I will use <a href="https://raytracing.github.io/books/RayTracingInOneWeekend.html">Ray Tracing in One Weekend</a> as a reference for the basic path tracing implementation and <a href="https://developer.nvidia.com/blog/thinking-parallel-part-ii-tree-traversal-gpu/">NVIDIA&#x27;s Thinking Parallel</a> for GPU BVH traversal techniques. I will also use CUDA profiling tools to identify potential optimizations. If time permits, I would like use my AMD GPU to explore porting the implementation to HIP/ROCm.</p>
 </section>
 <section id="goals">
-<h2>Goals and deliverables</h2>
-<h3>Plan to achieve</h3>
+<h2>Goals and Deliverables</h2>
+<h3>Plan to Achieve (100%)</h3>
 <ul>
-<li>A correct sequential segmented sieve and benchmark harness that count primes without printing or retaining the full list.</li>
-<li>An optimized multicore CPU version, including comparisons of byte and bit storage for odd candidates, segment-size tuning, and thread-scaling measurements.</li>
-<li>A correct NVIDIA GPU version, with experiments on work assignment, memory representation, and launch configuration.</li>
-<li>Repeated ten-second runs and fixed-range tests reporting prime counts, completed upper bounds, runtime, throughput, and variation.</li>
-<li>An experimental evaluation explaining CPU and GPU bottlenecks through profiling and component timings, including an external CPU comparison with primesieve under matched timing and core-count conditions.</li>
+<li>Implement a fully-functional CUDA path tracer supporting ray generation, intersection testing, multiple ray bounces, and basic materials</li>
+<li>Implement BVH traversal for intersection testing</li>
+<li>Optimize GPU performance with CUDA thread-block sizes, memory organization, and other optimizations</li>
+<li>Evaluate and measure rendering performance across different scenes, image resolutions, samples-per-pixel, scene complexities, and ray bounces</li>
 </ul>
-<p>I aim to maximize the verified prime count achieved by my implementations in ten seconds. I will establish baselines before setting numerical speedup targets. Success will mean correct CPU and GPU versions, measured improvements from optimization, and an explanation of the remaining performance limits.</p>
-<h3>Benchmark rules</h3>
-<p>Each run will use a declared search ceiling and process segments beginning at 2. Its score will be the number of primes in the largest contiguous prefix whose counts have completed and reached the host before the ten-second deadline. Later segments separated by an unfinished interval will only count once the gap closes. Results arriving after the deadline will be excluded.</p>
-<p>The primary timed interval will begin after program startup and device-context initialization, with no precomputed prime tables. It will include base-prime generation, working-buffer allocation and initialization, required transfers, sieving, and result counting. Costs outside this interval will be reported separately. Fixed-range benchmarks will use equivalent timing boundaries and wait for all required device work to complete.</p>
-<h3>Hope to achieve</h3>
+<h3>Hope to Achieve (125%)</h3>
 <ul>
-<li>Port the GPU version to my AMD GPU if supported, and investigate which optimizations transfer across vendors.</li>
-<li>Run the CPU implementation across the three laptops, comparing static and dynamic segment assignment and measuring communication overhead.</li>
-<li>Test a PSC system if access and time permit.</li>
+<li>Add complex materials, like reflections and refractions, and support more detailed scenes</li>
+<li>Port the CUDA path tracer to HIP using AMD’s ROCm platform to run on my AMD gpu and explore NVIDIA vs AMD architecture, performance, and programming experience</li>
+<li>A live demo that displays rendered scenes with adjustable parameters</li>
 </ul>
-<p>These extensions will follow the core CPU and NVIDIA GPU evaluation. An optional live demonstration will display a leaderboard of ten-second scores.</p>
-<h3>If progress is slower</h3>
-<p>I will drop additional platforms first and focus on the optimized CPU version and one correct GPU design with a focused set of experiments. If GPU development remains incomplete, I will present the CPU results and documented GPU limitations and discuss the revised scope with staff at the milestone.</p>
-<h3>Evaluation questions</h3>
+<h3>Minimum to Achieve (75%)</h3>
 <ul>
-<li>Which tested platform counts the most primes under the same timing rules?</li>
-<li>How do segment size, storage, and work assignment affect performance?</li>
-<li>Where does CPU thread scaling stop helping, and why?</li>
-<li>How much GPU time goes to setup, transfers, marking, and counting?</li>
-<li>How much improvement comes from software optimization on the same hardware?</li>
+<li>Implement a fully-functional CUDA path tracer with basic materials and multiple ray bounces, but without BVH traversal and additional rendering features.</li>
+<li>Profile and optimize memory organization and block-size</li>
+<li>Evaluate and measure rendering performance across different scenes, image resolutions, samples-per-pixel, scene complexities, and ray bounces</li>
 </ul>
 </section>
 <section id="platform">
-<h2>Platform choice</h2>
-<p>CPUs provide a starting point for studying cache behavior, compact storage, and multicore scaling. NVIDIA GPUs provide a different execution model for the same workload and let me investigate parallel work assignment, memory access, and synchronization in CUDA.</p>
-<p>This comparison aligns with my interest in accelerator software and performance engineering. The AMD GPU, laptop cluster, and possible PSC access provide additional experiments after the core implementations are complete.</p>
+<h2>Platform Choice</h2>
+<p>I plan to use C++ and CUDA on the NVIDIA GPUs in the GHC machines. Path tracing is well suited for GPU parallelization in CUDA because thousands of rays can be computed independently across thousands of threads. If time permits, I hope to port the implementation to HIP and run it on an AMD GPU to explore differences between the two architectures.</p>
 </section>
 <section id="schedule">
 <h2>Schedule</h2>
-<p>Calendar dates and the official intermediate milestone deadline still need confirmation. I will review progress weekly and revise the schedule accordingly.</p>
-<div class="table-wrap">
-<table>
-<thead>
-<tr>
-<th scope="col">Week</th>
-<th scope="col">Planned work</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<th scope="row">Week 1</th>
-<td>Confirm CPU and NVIDIA GPU access, record specifications, and implement reference and segmented sieves with correctness checks and timing.</td>
-</tr>
-<tr>
-<th scope="row">Week 2</th>
-<td>Optimize CPU storage and segment size, add multicore execution, and obtain an initial correct GPU version. Prepare baseline results and the milestone update.</td>
-</tr>
-<tr>
-<th scope="row">Week 3</th>
-<td>Profile and optimize the GPU implementation. Compare configurations and work assignments. Run initial fixed-range and ten-second comparisons.</td>
-</tr>
-<tr>
-<th scope="row">Week 4</th>
-<td>Complete repeated experiments, analysis, final report, and poster. Attempt additional platforms only if core results are complete.</td>
-</tr>
-</tbody>
-</table>
-</div>
-<p>I reserve the final week primarily for evaluation and writing, with optional platform work depending on progress and other coursework.</p>
+<h3>Week 1 (11/16–11/22): Basic Path Tracer Implementation</h3>
+<ul>
+<li>Implement camera, ray generation, and ray-object intersection routines in C++</li>
+<li>Implement basic CUDA kernels to parallelize ray generation and intersection testing</li>
+<li>Add multiple ray bounces, basic materials, and image output</li>
+</ul>
+<h3>Week 2 (11/23–11/29): BVH Acceleration</h3>
+<ul>
+<li>Implement BVH construction and GPU-based traversal</li>
+<li>Compare rendering performance with and without BVH acceleration</li>
+<li>Debug and verify rendering correctness</li>
+</ul>
+<h3>Week 3 (11/30–12/6): Optimization and Evaluation</h3>
+<ul>
+<li>Profile CUDA kernels to identify performance bottlenecks</li>
+<li>Experiment with thread-block sizes, memory organization, and other optimizations</li>
+<li>Benchmark different scene complexities, resolutions, sample counts, and bounce depths</li>
+</ul>
+<h3>Week 4 (12/7–12/10): Final Evaluation and Presentation</h3>
+<ul>
+<li>Complete remaining optimizations and performance measurements</li>
+<li>Generate example scenes and graphs showing performance results</li>
+<li>Prepare the final report, poster, and optional live demo for the parallelism competition</li>
+</ul>
 </section>
-
+</main>
 </body>
 </html>
